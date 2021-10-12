@@ -1,0 +1,309 @@
+﻿@{
+    ViewBag.Title = "Home Page";
+}
+<h2>Agenda</h2>
+
+<button type="button" class="btn btn-default pull-right" id="btnAddContact" data-toggle="tooltip" title="Agregar" data-contactid="0">
+    Agregar
+</button>
+
+<div class="row">
+    <div class="container">
+        <table id="tblContacts"></table>
+    </div>
+</div>
+
+<!-- FORM MODAL -->
+<div class="modal fade" id="ContactForm" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                <center><h4 class="modal-title" id="myModalLabel">Datos</h4></center>
+            </div>
+            <form id="frmContact">
+                <div class="modal-body ui-front">
+                    <div class="row">
+
+                        <div class="col-lg-6">
+                            <input type="hidden" id="txtContactId" />
+                            <div class="form-group">
+                                <label for="FirstName">Nombre (s)</label>
+                                <input type="text" class="form-control" id="FirstName" name="FirstName" />
+                            </div>
+
+                            <div class="form-group">
+                                <label for="LastName">Apellidos</label>
+                                <input type="text" class="form-control" id="LastName" name="LastName" />
+                            </div>
+                        </div>
+                        <div class="col-lg-6">
+                            <div class="form-group">
+                                <label for="PhoneNumber">Telefono</label>
+                                <input type="text" class="form-control" id="PhoneNumber" name="PhoneNumber" maxlength="10"/>
+                            </div>
+                            <div class="form-group">
+                                <label for="Email">Correo electronico</label>
+                                <input type="email" class="form-control" id="Email" name="Email" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary" id="btnSaveContact" download>Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- DELETE MODAL-->
+<div class="modal fade" id="ModalDeleteUser" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header alert alert-danger">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+                <center><h4 class="modal-title" id="myModalLabel">Eliminar</h4></center>
+            </div>
+            <div class="modal-body">
+                <center><p class="success-message">¿Estás seguro de que deseas eliminar este registro? </p></center>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-default" id="btnCloseConfirm" data-dismiss="modal">No</button>
+                <button class="btn btn-danger" id="btnDeleteConfirm">Sí</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@section scripts{
+    <script>
+        $(document).ready(function () {
+            var UserId;
+
+            $('#tblContacts').bootstrapTable('destroy').bootstrapTable({
+                url: "/Home/GetContacts/",
+                type: "POST",
+                pageList: [10, 25, 50, 100],
+                pageSize: 10,
+                pagination: true,
+                locale: "es-MX",
+                method: 'POST',
+                search: true,
+                searchAlign: "left",
+                sidePagination: "server",
+                queryParams: function (params) {
+                    var jParams = JSON.stringify({
+                        PageSize: params.limit,
+                        PageNumber: (params.offset / params.limit) + 1,
+                        SortOrder: params.order,
+                        SortName: params.sort,
+                        Search: params.search
+                    });
+
+                    console.log(params);
+                    return jParams;
+                },
+                columns: [
+                    [
+                        { title: 'Nombre (s)', field: 'FirstName', sortable: "true" },
+                        { title: 'Apellidos', field: 'LastName', sortable: "true" },
+                        { title: 'Telefono', field: 'PhoneNumber', sortable: "true" },
+                        { title: 'E-mail', field: 'Email', sortable: "true" },
+                        { title: 'Acciones', field: 'OperateActions', align: 'center', clickToSelect: false, formatter: OperateActionsFormatter, events: window.OperateActionsEvents }
+                    ]
+                ],
+                onLoadSuccess: function (response) {
+                    console.log(response);
+                },
+                onLoadError: function (error) {
+                    //swal("Error", "500 error interno en el servidor", "error");
+                }
+            });
+
+            $("#btnAddContact").click(function (e) {
+                var ContactId = $(this).attr('data-contactid');
+                ClearForm();
+                $('#ContactForm').modal('show');
+                console.log(ContactId);
+            });
+
+            $('#PhoneNumber').keypress(function (e) {
+                var charCode = (e.which) ? e.which : event.keyCode
+
+                if (String.fromCharCode(charCode).match(/[^0-9]/g))
+                    return false;
+            });
+
+            $('input').keypress(function (e) {
+                $(this).removeAttr('style');
+            })
+
+            $("#frmContact").submit(function (e) {
+                e.preventDefault();
+                var form = new FormData(this);
+
+                var IsValid = ValidateForm();
+                if (IsValid) {
+                    $.ajax({
+                        url: '/Home/Save/',
+                        type: "POST",
+                        data: {
+                            Id: $("#txtContactId").val(),
+                            FirstName: $("#FirstName").val(),
+                            LastName: $("#LastName").val(),
+                            PhoneNumber: $("#PhoneNumber").val(),
+                            Email: $("#Email").val()
+                        },
+                        dataType: "json",
+                        success: function (data) {
+                            console.log(data);
+                            $('#tblContacts').bootstrapTable('refresh');
+                            alert("Registro guardado con exito");
+                            $('#ContactForm').modal('hide');
+                        },
+                        error: function (jqXHR, textStatus, errorThrown) {
+                            console.log('Error ', jqXHR);
+                            return false;
+                        }
+                    });
+                } else {
+                    alert("Los campos marcados con * son obligatorios");
+                }
+
+            });
+        });
+
+        // BOTONES DE ACCIÓN
+        function OperateActionsFormatter(value, row, index) { // PDF BUTTON
+            return [
+                @{
+
+                        <text>
+                            '<a id="btnEdit" class="btn btn-default btn-xs" href="javascript:void(0)" data-toggle="tooltip" title="Editar">',
+                            'Editar',
+                            '</a> ',
+                        </text>
+
+                        <text>
+                            '<a id="btnDelete" class="btn btn-danger btn-xs" href="javascript:void(0)" data-toggle="tooltip" title="Eliminar">',
+                            'Eliminar',
+                            '</a>'
+                        </text>
+
+                }
+            ].join('')
+        };
+
+        function ClearForm() {
+            $("#FirstName").val('');
+            $("#PhoneNumber").val('');
+            $("#LastName").val('');
+            $("#Email").val('');
+            $("#txtContactId").val('');
+        }
+
+        function ValidateForm() {
+            var IsValid = true;
+
+            var CssStyle = {
+                "-webkit-box-shadow": "0px 0px 14px -2px rgba(237, 17, 9, 1)",
+                "-moz-box-shadow": "0px 0px 14px -2px rgba(237, 17, 9, 1)",
+                "box-shadow": "0px 0px 14px -2px rgba(237, 17, 9, 1)"
+            };
+
+            if ($("#FirstName").val() == "") {
+                $("#FirstName").css(CssStyle);
+                IsValid = false;
+            }
+
+            if ($("#PhoneNumber").val() == "") {
+                $("#PhoneNumber").css(CssStyle);
+                IsValid = false;
+            }
+
+            if ($("#LastName").val() == "") {
+                $("#LastName").css(CssStyle);
+                IsValid = false;
+            }
+
+            if ($("#Email").val() == "") {
+                $("#Email").css(CssStyle);
+                IsValid = false;
+            }
+
+            return IsValid;
+        }
+
+        window.OperateActionsEvents = {
+            'click #btnEdit': function (e, value, row, index) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                ClearForm();
+
+                $.ajax({
+                    url: '/Home/GetContactById/',
+                    data: { 'ContactId': row.Id },
+                    type: 'post',
+                    success: function (data) {
+                        console.log("response", data.contact);
+
+                        $("#FirstName").val(data.contact.FirstName);
+                        $("#PhoneNumber").val(data.contact.PhoneNumber);
+                        $("#LastName").val(data.contact.LastName);
+                        $("#Email").val(data.contact.Email);
+                        $("#txtContactId").val(data.contact.Id);
+                        $('#ContactForm').modal('show');
+                    }, error: function (err) {
+                        console.log(err);
+                    }
+                });
+            },
+            'click #btnDelete': function (e, value, row, index) {
+                UserId = row.Id;
+
+                if ($('.modal-header').hasClass('alert-success')) {
+                    $('.modal-header').removeClass('alert-success').addClass('alert-danger');
+                }
+
+                $("#btnCloseConfirm").html('No');
+                $("#btnDeleteConfirm").show();
+                $('.success-message').html('¿Estás seguro de que deseas eliminar este registro?');
+                $('#ModalDeleteUser').modal('show');
+            }
+        };
+
+        $('#btnDeleteConfirm').click(function () {
+            if (UserId !== '') {
+                $.ajax({
+                    url: '/Home/Delete/',
+                    data: { 'ItemId': UserId },
+                    type: 'get',
+                    success: function (data) {
+                        if (data) {
+                            if ($('.modal-header').hasClass('alert-danger')) {
+                                $('.modal-header').removeClass('alert-danger').addClass('alert-success');
+                            }
+                            $('.success-message').html('Registro eliminado con exito.');
+
+                            $("#btnDeleteConfirm").hide();
+                            $("#btnCloseConfirm").html('Ok');
+                            $('#tblContacts').bootstrapTable('refresh');
+                        }
+                    }, error: function (err) {
+                        if (!$('.modal-header').hasClass('alert-danger')) {
+                            $('.modal-header').removeClass('alert-success').addClass('alert-danger');
+                            $('.customer-confirm').css('display', 'none');
+                        }
+                        $('.success-message').html(err.statusText);
+                    }
+                });
+            }
+        });
+
+
+    </script>
+}
